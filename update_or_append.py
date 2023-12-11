@@ -12,7 +12,6 @@ def update_or_append(sheet_id: str, df: pd.DataFrame, primary_column_name: str) 
     Update or append rows to a Smartsheet based on the primary column value.
 
     Args:
-        api_key (str): Smartsheet API key.
         sheet_id (str): ID of the Smartsheet to update/append.
         df (pd.DataFrame): DataFrame containing the data to be updated/appended.
         primary_column_name (str): Name of the primary column in the DataFrame and Smartsheet.
