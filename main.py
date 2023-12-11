@@ -15,24 +15,31 @@ def app():
     queries = load_queries('queries/queries.json')
 
     # Create database engines
-    dw_engine = get_engine(create_connection_string('dw'))
-    qnxt_engine = get_engine(create_connection_string('qnxt'))
+    dw_engine = get_engine(create_connection_string('DW'))
+    qnxt_engine = get_engine(create_connection_string('QN'))
+    dm_engine = get_engine(create_connection_string('DM'))
 
     # Iterate over queries
     for name, query in queries.items():
         try:
-            process_query(name, query, dw_engine, qnxt_engine)
+            process_query(name, query, dw_engine, qnxt_engine, dm_engine)
         except Exception as e:
             logging.error(f"Error processing {name}: {e}")
 
-def process_query(name: str, query: dict, dw_engine, qnxt_engine):
+def process_query(name: str, query: dict, dw_engine, qnxt_engine, dm_engine):
     """Process a single query."""
-    engine = dw_engine if query['database'] == 'dw' else qnxt_engine
+    if query['database'] == 'DW':
+        engine = dw_engine
+    elif query['database'] == 'QN':
+        engine = qnxt_engine
+    elif query['database'] == 'DM':
+        engine = dm_engine
+        
     sql = load_sql_file(f'queries/{query["sql"]}')
 
     try:
-        for chunk in pd.read_sql(sql, engine, chunksize=1000):
-            update_or_append(query['id'], chunk, query['primary_column'])
+        df = pd.read_sql(sql, engine)
+        update_or_append(query['id'], df, query['primary_column'])
     except sqlalchemy_exc.SQLAlchemyError as e:
         logging.error(f"SQLAlchemyError in query {name}: {e}")
 

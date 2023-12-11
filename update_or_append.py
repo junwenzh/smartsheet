@@ -39,7 +39,7 @@ def update_or_append(sheet_id: str, df: pd.DataFrame, primary_column_name: str) 
         # Mapping DataFrame columns to Smartsheet column IDs
         column_map = {col.title: col.id for col in sheet.columns}
 
-        # Get the primary column ID
+        # Get the primary columns IDs
         primary_column_id = column_map.get(primary_column_name)
 
         # If not all columns in the DataFrame are in the Smartsheet, log an error
@@ -64,10 +64,15 @@ def update_or_append(sheet_id: str, df: pd.DataFrame, primary_column_name: str) 
             }) for col in df.columns]
 
             if existing_row:
+                # If the values are the same, skip the row. Get columns using the column_map
+                if all(existing_row.get_column(column_map[col]).value == row[col] for col in df.columns):
+                    # Log the skipped row
+                    logging.info(f"{sheet.name}: Skipped row with {primary_column_name} value {row[primary_column_name]}")
+                    continue
                 new_smartsheet_row.id = existing_row.id
                 rows_to_update.append(new_smartsheet_row)
             else:
-                new_smartsheet_row.to_top = False
+                new_smartsheet_row.to_bottom = True
                 rows_to_add.append(new_smartsheet_row)
 
         # Update existing rows
@@ -85,8 +90,3 @@ def update_or_append(sheet_id: str, df: pd.DataFrame, primary_column_name: str) 
     except Exception as e:
         logging.error(f"An unexpected error occurred in update_or_append: {e}", exc_info=True)
         return False
-
-
-if __name__ == "__main__":
-    # do nothing
-    pass
