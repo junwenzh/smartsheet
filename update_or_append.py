@@ -1,11 +1,14 @@
-import smartsheet
-import pandas as pd
-from typing import Any
 import logging
 import os
+from typing import Any
+
+import pandas as pd
 from dotenv import load_dotenv
 
+import smartsheet
+
 load_dotenv()
+
 
 def update_or_append(sheet_id: str, df: pd.DataFrame, primary_column_name: str) -> bool:
     """
@@ -20,7 +23,7 @@ def update_or_append(sheet_id: str, df: pd.DataFrame, primary_column_name: str) 
     If no match is found, it appends the row as a new entry. Errors are logged for troubleshooting.
     """
     try:
-        api_key = os.getenv('SMARTSHEET_API_KEY')
+        api_key = os.getenv("SMARTSHEET_API_KEY")
 
         # Initialize client
         smartsheet_client = smartsheet.Smartsheet(api_key)
@@ -44,33 +47,51 @@ def update_or_append(sheet_id: str, df: pd.DataFrame, primary_column_name: str) 
 
         # If not all columns in the DataFrame are in the Smartsheet, log an error
         if not all(col in column_map for col in df.columns):
-            logging.error(f"Not all columns in the DataFrame are in the Smartsheet. Please check the column names.")
+            logging.error(
+                f"Not all columns in the DataFrame are in the Smartsheet. Please check the column names."
+            )
             return False
 
         # Prepare rows to update or add
         rows_to_update = []
         rows_to_add = []
 
+        rows_to_update_set = set()
+
         for index, row in df.iterrows():
             # Find the row in the Smartsheet that matches the primary column value
-            existing_row = next((r for r in sheet.rows if r.get_column(primary_column_id).value == row[primary_column_name]), None)
+            existing_row = next(
+                (
+                    r
+                    for r in sheet.rows
+                    if r.get_column(primary_column_id).value == row[primary_column_name]
+                ),
+                None,
+            )
 
             new_smartsheet_row = smartsheet.models.Row()
 
             # Add the cells to the row
-            new_smartsheet_row.cells = [smartsheet.models.Cell({
-                'column_id': column_map[col],
-                'value': row[col]
-            }) for col in df.columns]
+            new_smartsheet_row.cells = [
+                smartsheet.models.Cell(
+                    {"column_id": column_map[col], "value": row[col]}
+                )
+                for col in df.columns
+            ]
 
             if existing_row:
                 # If the values are the same, skip the row. Get columns using the column_map
-                if all(existing_row.get_column(column_map[col]).value == row[col] for col in df.columns):
+                if all(
+                    existing_row.get_column(column_map[col]).value == row[col]
+                    for col in df.columns
+                ):
                     # Log the skipped row
-                    logging.info(f"{sheet.name}: Skipped row with {primary_column_name} value {row[primary_column_name]}")
+                    # logging.info(f"{sheet.name}: Skipped row with {primary_column_name} value {row[primary_column_name]}")
                     continue
                 new_smartsheet_row.id = existing_row.id
-                rows_to_update.append(new_smartsheet_row)
+                if new_smartsheet_row.id not in rows_to_update_set:
+                    rows_to_update_set.add(new_smartsheet_row.id)
+                    rows_to_update.append(new_smartsheet_row)
             else:
                 new_smartsheet_row.to_bottom = True
                 rows_to_add.append(new_smartsheet_row)
@@ -78,15 +99,21 @@ def update_or_append(sheet_id: str, df: pd.DataFrame, primary_column_name: str) 
         # Update existing rows
         if rows_to_update:
             smartsheet_client.Sheets.update_rows(sheet_id, rows_to_update)
-            logging.info(f"Updated {len(rows_to_update)} rows in Smartsheet ID {sheet_id}")
+            logging.info(
+                f"Updated {len(rows_to_update)} rows in Smartsheet ID {sheet_id}"
+            )
 
         # Add new rows
         if rows_to_add:
             smartsheet_client.Sheets.add_rows(sheet_id, rows_to_add)
-            logging.info(f"Added {len(rows_to_add)} new rows to Smartsheet ID {sheet_id}")
+            logging.info(
+                f"Added {len(rows_to_add)} new rows to Smartsheet ID {sheet_id}"
+            )
 
         return True
 
     except Exception as e:
-        logging.error(f"An unexpected error occurred in update_or_append: {e}", exc_info=True)
+        logging.error(
+            f"An unexpected error occurred in update_or_append: {e}", exc_info=True
+        )
         return False
